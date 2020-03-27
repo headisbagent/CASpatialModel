@@ -1,0 +1,5 @@
+workmem 32000
+aggind 10
+names no
+memoryemphasis 1
+threads=4
