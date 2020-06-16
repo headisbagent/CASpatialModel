@@ -4,23 +4,53 @@
 
 source('base.r')
 
-createRandomInputs <- function(numRegions,numVehicles,maxDemand) {
+routes <- fread('datafiles/TAZCentroid_50Samples_ShortestRoutes.csv')
+routes <- routes[Beg!=End,]
+intersect.taz <- fread('datafiles/TAZ_intersect.csv')
+
+routes <- merge(x=routes,y=intersect.taz,by='Route')
+
+taz <-  st_read(file.path('TAZCentroid_50Samples','TAZ_t1.shp'))
+taz.centroids <- st_read(file.path('TAZCentroid_50Samples','TAZ_t1_centroid.shp'))
+
+# Function to prepare the TAZ regions that a vehicle passes through when traveling from Beg to End
+
+# mergeTAZ.intersect <- function() {
+# 	files <- list.files('dataFiles/IntersectingTAZtxt_ID')
+
+# 	output <- data.table()
+# 	for(f in files) {
+# 		hold <- read.csv(paste0('dataFiles/IntersectingTAZtxt_ID/',f))
+# 		hold <- gsub('\\s+',' ',hold[1,])
+# 		hold <- substr(hold,2,nchar(hold))
+# 		hold <- gsub(' ',',',hold)
+# 		temp <- data.table('Route'=gsub('\\.csv','',f),'Intersect'=hold)
+# 		output <- rbind(output,temp)
+# 	}
+	
+# 	fwrite(output,file='dataFiles/TAZ_intersect.csv')
+# }
+
+prepTravelInputs <- function(numVehicles,efficiency) {
 	inputs <- list()
 	inputs$sets <- list()
 	inputs$parameters <- list()
 
-	inputs$sets$r <- paste0('r.',1:numRegions)
+	inputs$sets$r <- paste0(unique(routes$Beg))
 	inputs$sets$v <- paste0('v.',1:numVehicles)
 
+	route.assign <- routes[sample(1:nrow(routes),size=numVehicles,replace=TRUE)]
 	VtoR <- data.table()
-	for(veh in inputs$sets$v) {
-		r.hold <- sample(inputs$sets$r,sample(1:length(inputs$sets$r),1),replace=FALSE)
-		VtoR.hold <- data.table('v'=veh,'r'=r.hold)
+	for(veh in 1:numVehicles) {
+		r.hold <- as.numeric(unlist(strsplit(route.assign[veh,Intersect],',')))
+		VtoR.hold <- data.table('v'=inputs$sets$v[veh],'r'=paste0(r.hold))
 		VtoR <- rbind(VtoR,VtoR.hold)
 	}
 	inputs$sets$VtoR <- VtoR
 
-	inputs$parameters$demand <- data.table('v'=inputs$sets$v,'value'=runif(n=length(inputs$sets$v),min=1,max=maxDemand))
+	inputs$parameters$demand <- data.table('v'=inputs$sets$v,'value'=route.assign$Total_Mile*efficiency)
+
+	#print(inputs)
 
 	return(inputs)
 }
@@ -40,9 +70,9 @@ prepStationInputs <- function(stationInputFile) {
 	return(inputs)
 }
 
-runScenario <- function(scenarioName,numRegions,numVehicles,maxDemand,stationInputFile) {
+runScenario <- function(scenarioName,numVehicles,stationInputFile,efficiency) {
 	station <- prepStationInputs(stationInputFile)
-	other <- createRandomInputs(numRegions,numVehicles,maxDemand)
+	other <- prepTravelInputs(numVehicles,efficiency)
 
 	inputs <- list()
 	inputs$sets <- c(station$sets,other$sets)
@@ -65,30 +95,23 @@ runGams <- function(scenarioName) {
 	setwd(base.dir)
 }
 
-diagnosticPlot <- function(scenarioName) {
-	outputs.VtoR <- data.table(gdx(paste0('runFiles/',scenarioName,'/outputs.gdx'))['VtoR'])
-	outputs.demand <- data.table(gdx(paste0('runFiles/',scenarioName,'/outputs.gdx'))['demand'])
-	outputs.station <- data.table(gdx(paste0('runFiles/',scenarioName,'/outputs.gdx'))['station'])
-	outputs.fueled <- data.table(gdx(paste0('runFiles/',scenarioName,'/outputs.gdx'))['fueled'])
-
-	region.map <- data.table(r=unique(outputs.VtoR$r),x=runif(n=length(unique(outputs.VtoR$r)),min=0,max=100),y=runif(n=length(unique(outputs.VtoR$r)),min=0,max=100))
-
-	vehicle.map <- merge(x=outputs.VtoR,y=region.map,by='r',all.x=TRUE)
-	vehicle.map <- merge(x=vehicle.map,y=outputs.demand[,.(v,demand=value)],by='v',all.x=TRUE)
-	station.map <- merge(x=outputs.station[value>0,.(i,r,numStations=value)],y=region.map,by='r',all.x=TRUE)
-	station.map <- merge(x=station.map,y=outputs.fueled[value>0,.(fueled=sum(value)),by=r],by='r',all.x=TRUE)
-
-	plotSave <- ggplot()+
-		geom_path(data=vehicle.map,aes(x=x,y=y,group=v,size=demand),alpha=.5)+
-		geom_point(data=station.map,aes(x=x,y=y,size=fueled*3),colour='purple',alpha=.2)+
-		geom_point(data=station.map,aes(x=x,y=y,colour=i,size=numStations*20),alpha=.5)+
-		scale_radius(range=c(3,40))+
-		theme_bw()
-
-	return(plotSave)
-}
-
-
-runScenario(scenarioName='test',numRegions=50,numVehicles=300,maxDemand=100,stationInputFile='inputs/station_inputs.csv')
+runScenario(scenarioName='test',numVehicles=5000,efficiency=0.1,stationInputFile='inputs/station_inputs.csv')
 runGams(scenarioName='test')
-diagnosticPlot('test')
+
+outputs.VtoR <- data.table(gdx(paste0('runFiles/',scenarioName,'/outputs.gdx'))['VtoR'])
+outputs.demand <- data.table(gdx(paste0('runFiles/',scenarioName,'/outputs.gdx'))['demand'])
+outputs.station <- data.table(gdx(paste0('runFiles/',scenarioName,'/outputs.gdx'))['station'])
+outputs.fueled <- data.table(gdx(paste0('runFiles/',scenarioName,'/outputs.gdx'))['fueled'])
+
+route.intersect <- taz[taz$ID%in%outputs.VtoR$r,]
+
+stations.install <- merge(x=taz.centroids,y=outputs.station,by.x='ID',by.y='r')
+stations.install <- stations.install[stations.install$value>0,]
+
+plotSave <- ggplot()+
+	geom_sf(data=taz,color='black')+
+	geom_sf(data=route.intersect,fill='red')+
+	geom_sf(data=stations.install,aes(color=i,size=value))+
+	coord_sf()+
+	theme_bw()%+replace% theme(plot.background=element_blank(),panel.background=element_blank(),panel.border=element_blank(),axis.line=element_blank(),axis.text=element_blank(),axis.ticks=element_blank(),axis.title=element_blank())
+ggsave(plotSave,file='figures/test_case.png')
