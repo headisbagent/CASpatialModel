@@ -5,4 +5,4 @@ This GitHub repository houses the University of California, Davis Energy Futures
 # Travel Demand Module
 
 # Electricity Grid Module
-The electricity grid module is a subversion of the Grid Operation Optimized Dispatch (GOOD) model.  
+The electricity grid module is a sub-version of the Grid Operation Optimized Dispatch (GOOD) model.  
