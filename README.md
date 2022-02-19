@@ -6,3 +6,5 @@ This GitHub repository houses the University of California, Davis Energy Futures
 
 # Electricity Grid Module
 The electricity grid module is a sub-version of the Grid Operation Optimized Dispatch (GOOD) model.  
+
+![Screenshot](./grid_module/good_diagram.png)
