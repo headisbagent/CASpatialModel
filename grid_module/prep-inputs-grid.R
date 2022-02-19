@@ -19,6 +19,7 @@ prep.inputs.grid <- function(tInput,yr,scenario,rpsOption) {
 	inputs$sets$gas <- generators.aggregated[FuelType=='NaturalGas']$g
 	inputs$sets$hydro <- generators.aggregated[FuelType=='Hydro']$g
 	inputs$sets$r <- as.character(unique(generators.aggregated$RegionSimple))
+	inputs$sets$ca <- c('CA_N','CA_LA','CA_SD')
 	inputs$sets$gtor <- generators.aggregated[,list(g,RegionSimple)]
 	names(inputs$sets$gtor) <- c('g','r')
 
