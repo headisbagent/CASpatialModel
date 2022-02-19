@@ -43,7 +43,7 @@ runScenario <- function(yr,scenario,scenarioDemand,dInput,storCostInput,pemCostI
 }
 
 # If you want to run/test a single year run, syntax is as follows:
-# runScenario(2025,'lowDemand_ctH2','2025_base',1:365,storCostInput=.2,pemCostInput=30000,'baseRPS','good.gms')
+# runScenario(2025,'lowDemand_ctH2','2025_base',1:365,storCostInput=.2,pemCostInput=30000,'rpsBase','good.gms')
 
 # Note there are three RPS options:
 # 'rpsBase' - baseline RPS with existing RPS requirements, 'rpsAll' - all regions have identical RPS requirements to CA, 'rps100' - CA now has RPS requirements that go all the way to 100%
