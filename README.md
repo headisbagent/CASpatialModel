@@ -1,9 +1,8 @@
 # California Spatial Modeling Project
 
-This GitHub repository is meant to house the University of California, Davis Energy Futures Program's spatial model of the transportation and electricity grid system in California.  The model currently consists of the following modules:
+This GitHub repository houses the University of California, Davis Energy Futures Program's spatial model of the transportation and electricity grid system in California to investigate scenarios of a hydrogen economy.  The project is divided into a transport demand and infrastructure module and an electricity grid module.
 
-1. Travel Demand
-2. Mode/Technology Choice
-3. Energy Simulation
-4. Infrastructure Deployment
-5. Electricity Grid
+# Travel Demand Module
+
+# Electricity Grid Module
+The electricity grid module is a subversion of the Grid Operation Optimized Dispatch (GOOD) model.  
