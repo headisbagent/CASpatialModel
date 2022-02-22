@@ -43,8 +43,8 @@ scalar
 	transLoss 		Transmission efficiency [unitless] /.972/
 	storageLossIn	PEM efficiency [kg per MW] /18.2/
 	storageLossOut	H2 CT efficiency [MW per kg] /.025/
-	solarCost 		Solar capacity cost [$ per MW] /100000/
-	windCost 		Wind capacity cost [$ per MW] /130000/
+	solarCost 		Solar capacity cost [$ per MW] /80000/
+	windCost 		Wind capacity cost [$ per MW] /160000/
 	storCost		Storage capacity cost [$ per kg] /<<storCostValue>>/
 	pemCost			PEM electrolyzer cost [$ per MW] /<<pemCostValue>>/
 	waterCost 		Cost of water [$ per kg] /.009/
