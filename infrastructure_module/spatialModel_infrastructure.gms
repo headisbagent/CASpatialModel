@@ -23,6 +23,7 @@ parameters
 	cost(i)					Cost to install station
 	hourlyCapacity(i)		Station capacity per hour
 	existingStations(i,r)	Existing stations
+	maxStations(r)			Max number of stations in a region
 	;
 
 positive variable
@@ -39,7 +40,7 @@ variable
 	;
 
 $gdxin inputs
-$load i r v t VtoR demand dailyCapacity hourlyCapacity cost existingStations
+$load i r v t VtoR demand dailyCapacity hourlyCapacity cost existingStations maxStations
 $gdxin
 
 equations
@@ -47,6 +48,7 @@ equations
 	constraint1 	Vehicle fueling must be greater than energy demand
 	constraint2 	Daily fueling capacity must be greater than fuel dispensed
 	constraint3		Hourly fueling capacity constraint
+	constraint4		Maximum number of stations by region constraint
 	;
 
 obj..
@@ -70,8 +72,11 @@ constraint2(r)..
 constraint3(r,t)..
 	sum(v,fueled(r,v,t)$demand(v))-sum(i,station(i,r)*hourlyCapacity(i)+existingStations(i,r)*hourlyCapacity(i)) =l= 0;
 
+constraint4(r)..
+	maxStations(r)-sum(i,station(i,r)) =g= 0;
+
 model
-	spatialModel_infrastructure /obj,constraint1,constraint2,constraint3/
+	spatialModel_infrastructure /obj,constraint1,constraint2,constraint3,constraint4/
 	;
 
 

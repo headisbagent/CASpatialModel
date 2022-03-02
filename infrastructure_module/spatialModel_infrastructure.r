@@ -15,6 +15,8 @@ ld.priv.all <- fread('inputs/ld_priv.csv')
 cluster.map <- fread('cluster/cluster_all.csv')
 cluster.all <- merge(x=cluster.map,y=route.overlap,by='v')
 
+max.stations <- fread('inputs/max_stations.csv')
+
 generate.all.ld <- function(input,proportion) {
 	output <- data.table()
 	for(y in 2020:2050) {
@@ -136,6 +138,7 @@ prepStationInputs <- function(stationInputFile) {
 	inputs$parameters$dailyCapacity <- station_inputs[,list(i,value=dailyCapacity)]
 	inputs$parameters$hourlyCapacity <- station_inputs[,list(i,value=hourlyCapacity)]
 	inputs$parameters$cost <- station_inputs[,list(i,value=cost)]
+	inputs$parameters$maxStations <- max.stations
 
 	return(inputs)
 }
