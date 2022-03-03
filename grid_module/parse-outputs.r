@@ -4,6 +4,8 @@ source('prep-inputs-mobility.R')
 
 ca.regions <- c('CA_N','CA_LA','CA_SD')
 
+FuelType.key <- data.table(FuelType=c('Biomass','Coal','Fwaste','Geothermal','Hydro','LF Gas','MSW','NaturalGas','Non-fossil','Nuclear','Oil','Pet. Coke','Pumps','Solar','Tires','Waste Coal','Wind'),FuelType.simple=c('Biomass','Coal','Biomass','Geothermal','Hydro','NaturalGas','Biomass','NaturalGas','Other','Nuclear','Oil','Coal','Hydro','Solar','Coal','Coal','Wind'))
+
 fetchOutputs <- function(scenario,yr) {
 	scenario.name <- paste(yr,scenario,sep='_')
 
@@ -68,20 +70,21 @@ plot.GeneratorsMap <- function() {
 ##################################################################################
 # Plotting outputs 																 #
 ##################################################################################
-# 1. Generation mix (annual bar: fill by fuel, facet by region)
-# 2. Example of dispatch, 1 week (area: facet by region; separate years)
-# 3. Total curtailment in WECC by hour (line: color by year)
-# 4. Transmission map (sf, arrow lines: total amount and saturation of capacity)
-# 5. Total transmission, CA imports (bar: total by year)
-# 6. Capacity factor (line, ribbon: facet by fuel)
-# 7. New capacity installed (line/bar: capacity each year, facet by technology)
-# 8. Cumulative capacity (bar: cum capacity by year, facet by technology)
-# 9. Hourly PEM operation (line: facet by year)
-# 10. Hourly storage SOC (line: facet by year)
-# 11. Hourly utilization of PEM (bar: fill by type by year, facet by region)
-# 12. Hourly marginal generation costs (line: color by region, facet by year)
-# 13. Hourly average emissions factor (line: facet by year)
-# 14. Map of total annual pollutant emissions, avg hourly emissions (sf, point: color by pollutant, separate maps by year)
+# Generation mix (annual bar: fill by fuel, facet by region)
+# Example of dispatch, customizable # days (area: facet by region; separate years)
+# Example of detailed dispatch, 10 days with load/export/import/h2prod details (area: facet by region, lines for demand side)
+# Total curtailment in WECC by hour (line: color by year)
+# Transmission map (sf, arrow lines: total amount and saturation of capacity)
+# Total transmission, CA imports (bar: total by year)
+# Capacity factor (line, ribbon: facet by fuel)
+# New capacity installed (line/bar: capacity each year, facet by technology)
+# Cumulative capacity (bar: cum capacity by year, facet by technology)
+# Hourly PEM operation (line: facet by year)
+# Hourly storage SOC (line: facet by year)
+# Hourly utilization of PEM (bar: fill by type by year, facet by region)
+# Hourly marginal generation costs (line: color by region, facet by year)
+# Hourly average emissions factor (line: facet by year)
+# Map of total annual pollutant emissions, avg hourly emissions (sf, point: color by pollutant, separate maps by year)
 ###################################################################################
 
 parseGeneration <- function(input) {
@@ -130,7 +133,52 @@ plot.exampleDispatch <- function(input,days,scenario) {
 		ggsave(plotSave,file=paste0('figures/dispatch_examples/dispatch_',scenario,'_yr',yr,'_days',min(days),'-',max(days),'.pdf'),height=8,width=12)
 		ggsave(plotSave,file=paste0('figures/dispatch_examples/dispatch_',scenario,'_yr',yr,'_days',min(days),'-',max(days),'.png'),height=8,width=12)
 	}
+}
+
+plot.detailedDispatch <- function(input,input.gen,days,scenario) {
+	timePeriod <- ((min(days)-1)*24):(max(days)*24)
 	
+	# Supply-side
+	forPlot.gen <- input.gen[t%in%timePeriod,.(generation=sum(generation)),by=.(t,r,year,Source=FuelType)]
+	forPlot.imports <- input$trans[as.numeric(t)%in%timePeriod,.(generation=sum(value),Source='Imports'),by=.(t=as.numeric(t),r=o,year)]
+	forPlot.storOut <- input$storOut[as.numeric(t)%in%timePeriod,.(t=as.numeric(t),r,year,generation=value*.025,Source='H2 CT')]
+
+	forPlot.supply <- rbind(forPlot.gen,forPlot.imports,forPlot.storOut)
+
+	# Demand-side
+	forPlot.load <- input$demandLoad[as.numeric(t)%in%timePeriod,.(t=as.numeric(t),r,year,demand=value,Type='Load')]
+	forPlot.exports <- input$trans[as.numeric(t)%in%timePeriod,.(exports=sum(value)),by=.(t=as.numeric(t),r,year)]
+	forPlot.exports <- merge(x=forPlot.load,y=forPlot.exports,by=c('t','r','year'))
+	forPlot.exports <- forPlot.exports[,.(t,r,year,demand=demand+exports,Type='Load+Exports')]
+
+	#### CHANGE THIS AFTER SWITCH TO H2 STOR ####
+	storIn <- input$storIn
+	storIn$t <- as.numeric(storIn$t)
+	fuelH2 <- input$fuelH2
+	fuelH2$t <- as.numeric(fuelH2$t)
+	
+	forPlot.pem <- merge(x=storIn,y=fuelH2,by=c('r','t','year'))
+	forPlot.pem[,pem:=value.x+value.y/18.2]
+	forPlot.pem <- forPlot.pem[t%in%timePeriod,.(t,r,year,pem)]
+	forPlot.pem <- merge(x=forPlot.exports,y=forPlot.pem,by=c('t','r','year'))
+	forPlot.pem <- forPlot.pem[,.(t,r,year,demand=demand+pem,Type='Load+Exports+PEM')]
+
+	forPlot.demand <- rbind(forPlot.load,forPlot.exports,forPlot.pem)
+
+	for(yr in unique(forPlot.supply$year)) {
+		plotSave <- ggplot()+
+			geom_area(data=forPlot.supply[year==yr],aes(x=t,y=generation/1000,fill=Source))+
+			scale_fill_discrete(name='Supply Source')+
+			geom_line(data=forPlot.demand[year==yr],aes(x=t,y=demand/1000,linetype=Type))+
+			scale_linetype_manual(name='Demand Source',values=c('dotted','longdash','solid'))+
+			xlab('Hour of the Year')+
+			ylab('Generation (GW)')+
+			theme_bw()+
+			facet_wrap(r~.,scales='free_y')+
+			theme(legend.position='bottom')
+		ggsave(plotSave,file=paste0('figures/dispatch_examples/detailedDispatch_',scenario,'_yr',yr,'_days',min(days),'-',max(days),'.pdf'),height=8,width=12)
+		ggsave(plotSave,file=paste0('figures/dispatch_examples/detailedDispatch_',scenario,'_yr',yr,'_days',min(days),'-',max(days),'.png'),height=8,width=12)
+	}
 }
 
 plot.curtailment <- function(input,input.generation,scenario) {
@@ -302,6 +350,7 @@ plot.cumulative.capacity <- function(input,scenario) {
 	ggsave(plotSave,file=paste0('figures/capacity_total_',scenario,'.png'),height=6,width=9)
 }
 
+#### CHANGE THIS AFTER SWITCH TO H2 STOR ####
 plot.pemOperation.annual <- function(input,scenario) {
 	storIn <- input$storIn
 	storIn$t <- as.numeric(storIn$t)
@@ -408,24 +457,33 @@ plot.all <- function(scenario,scenarioLabel) {
 	scenario.run <- fetchOutputs.allYears(scenario)
 	scenario.run.gen <- parseGeneration(scenario.run)
 
-	plot.GenerationMix(scenario.run.gen,scenarioLabel)
-	plot.exampleDispatch(scenario.run.gen,78:80,scenarioLabel)
-	plot.exampleDispatch(scenario.run.gen,170:172,scenarioLabel)
-	plot.exampleDispatch(scenario.run.gen,264:266,scenarioLabel)
-	plot.exampleDispatch(scenario.run.gen,354:356,scenarioLabel)
-	plot.curtailment(scenario.run,scenario.run.gen,scenarioLabel)
-	plot.transmission(scenario.run,scenarioLabel)
-	plot.transmission.ca.imports(scenario.run,scenarioLabel)
-	plot.capacityExpansion(scenario.run,scenarioLabel)
-	plot.cumulative.capacity(scenario.run,scenarioLabel)
-	plot.pemOperation.annual(scenario.run,scenarioLabel)
-	plot.storOperation.annual(scenario.run,scenarioLabel)
-	plot.utilizationPEM(scenario.run,scenarioLabel)
-	plot.genCosts.avgHourly(scenario.run.gen,scenarioLabel)
-	plot.hydrogenCT(scenario.run,scenario.run.gen,scenarioLabel)
+	# plot.GenerationMix(scenario.run.gen,scenarioLabel)
+	# plot.exampleDispatch(scenario.run.gen,78:80,scenarioLabel)
+	# plot.exampleDispatch(scenario.run.gen,170:172,scenarioLabel)
+	# plot.exampleDispatch(scenario.run.gen,264:266,scenarioLabel)
+	# plot.exampleDispatch(scenario.run.gen,354:356,scenarioLabel)
+	plot.detailedDispatch(scenario.run,scenario.run.gen,74:84,scenarioLabel)
+	plot.detailedDispatch(scenario.run,scenario.run.gen,166:176,scenarioLabel)
+	plot.detailedDispatch(scenario.run,scenario.run.gen,260:270,scenarioLabel)
+	plot.detailedDispatch(scenario.run,scenario.run.gen,350:360,scenarioLabel)
+	# plot.curtailment(scenario.run,scenario.run.gen,scenarioLabel)
+	# plot.transmission(scenario.run,scenarioLabel)
+	# plot.transmission.ca.imports(scenario.run,scenarioLabel)
+	# plot.capacityExpansion(scenario.run,scenarioLabel)
+	# plot.cumulative.capacity(scenario.run,scenarioLabel)
+	# plot.pemOperation.annual(scenario.run,scenarioLabel)
+	# plot.storOperation.annual(scenario.run,scenarioLabel)
+	# plot.utilizationPEM(scenario.run,scenarioLabel)
+	# plot.genCosts.avgHourly(scenario.run.gen,scenarioLabel)
+	# plot.hydrogenCT(scenario.run,scenario.run.gen,scenarioLabel)
 }
 
-plot.all('highDemand_ctH2_1-365','highDemand')
-plot.all('lowDemand_ctH2_1-365','lowDemand')
-plot.all('highDemand_ctH2_lowCosts_1-365','highDemand_lowCost')
-plot.all('highDemand_ctH2_noCurtail_1-365','highDemand_noCurtail')
+plot.all('highDemand_1-365','highDemand')
+plot.all('highDemand_noCurtail_1-365','highDemand_noCurtail')
+plot.all('highDemand_noH2Demand_1-365','highDemand_noH2Demand')
+plot.all('highDemand_noCurtail_noH2Demand_1-365','highDemand_noCurtail_noH2Demand')
+plot.all('highDemand_lowH2cost_1-365','highDemand_lowH2cost')
+plot.all('highDemand_highRenewCost_1-365','highDemand_highRenewCost')
+plot.all('highDemand_lowH2cost_highRenewCost_1-365','highDemand_lowH2cost_highRenewCost')
+plot.all('highDemand_rpsAll_1-365','highDemand_rpsAll')
+plot.all('highDemand_rps100_1-365','highDemand_rps100')
