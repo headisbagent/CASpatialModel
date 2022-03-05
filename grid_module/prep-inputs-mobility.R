@@ -11,7 +11,7 @@ region.intersect <- region.intersect[,.(County,TAZ12,IPM_Region=RegionSimple)]
 
 scenario <- 'CSTDM_trips10_distance150_prop01'
 
-get.dailyDemand <- function(scenario,dInput) {
+get.dailyDemand <- function(scenario,dInput,yr) {
 	inputs <- list()
 	inputs$parameters <- list()
 
@@ -31,5 +31,14 @@ get.dailyDemand <- function(scenario,dInput) {
 	final <- final[,.(r,d,value)]
 
 	inputs$parameters$h2Demand <- final
+
+	if(grepl('base',scenario,fixed=TRUE)|grepl('low',scenario,fixed=TRUE)) {
+		h2Stationary <- fread('inputs/inputs_h2Stationary_base.csv')
+		inputs$parameters$h2Stationary <- h2Stationary[year==yr,.(r,value)]
+	} else if(grepl('high',scenario,fixed=TRUE)) {
+		h2Stationary <- fread('inputs/inputs_h2Stationary_high.csv')
+		inputs$parameters$h2Stationary <- h2Stationary[year==yr,.(r,value)]
+	}
+
 	return(inputs)
 }

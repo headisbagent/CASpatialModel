@@ -22,7 +22,7 @@ runScenario <- function(yr,scenario,scenarioDemand,dInput,storCostInput,pemCostI
 	time.sets <- list(t=t[t%in%tInput],d=d[d%in%dInput],ttod=ttod[t%in%tInput])
 
 	inputs.grid <- prep.inputs.grid(tInput,yr,scenario,rpsOption)
-	inputs.mobility <- get.dailyDemand(scenarioDemand,dInput)
+	inputs.mobility <- get.dailyDemand(scenarioDemand,dInput,yr)
 	inputs$sets <- c(time.sets,inputs.grid$sets)
 	inputs$parameters <- c(inputs.mobility$parameters,inputs.grid$parameters)
 	write.gdx(paste0('runFiles/',scenarioName,'/inputs.gdx',sep=''),params=lapply(inputs$parameters,as.data.frame,stringsAsFactors=F),sets=lapply(inputs$sets,as.data.frame,stringsAsFactors=F))
