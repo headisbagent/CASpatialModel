@@ -9,6 +9,7 @@ generators.aggregated <- fread('inputs/raw_generators_aggregated.csv')
 transmission <- fread('inputs/inputs_transmission.csv')
 solar.cf <- fread('inputs/inputs_solarCF.csv')
 wind.cf <- fread('inputs/inputs_windCF.csv')
+wind.transCost <- fread('inputs/inputs_windTransCost.csv')
 
 prep.inputs.grid <- function(tInput,yr,scenario,rpsOption) {
 	inputs <- list()
@@ -80,6 +81,8 @@ prep.inputs.grid <- function(tInput,yr,scenario,rpsOption) {
 
 	inputs$parameters$solarCF <- solar.cf[,.(r,t,value=solarCF)]
 	inputs$parameters$windCF <- wind.cf[,.(r,t,value=windCF)]
+
+	inputs$parameters$windTransCost <- wind.transCost
 
 	## Storage and PEM Existing Capacity ##
 	if(yr==2025) {

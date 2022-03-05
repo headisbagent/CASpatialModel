@@ -34,9 +34,11 @@ parameters
 	transCap(r,o)		Capacity of transmission line [MW]
 	transCost(r,o)		Wheeling costs for transmission [$ per MW]
 	h2Demand(r,d)		Hydrogen demand from transportation sector [kg]
+	h2Stationary(r)		Hydrogen demand from stationary sources [kg]
 	storExisting(r)		Amount of storage from previous time period [kg]
 	pemExisting(r)		Amount of electrolyzer capacity from previous time period [MW]
 	percentRenew(r)		Renewable Portfolio Standards by region [unitless]
+	windTransCost(r)	Wind transmission connection costs [$ per MW]
 	;
 
 scalar
@@ -44,7 +46,7 @@ scalar
 	storageLossIn	PEM efficiency [kg per MW] /18.2/
 	storageLossOut	H2 CT efficiency [MW per kg] /.025/
 	solarCost 		Solar capacity cost [$ per MW] /80000/
-	windCost 		Wind capacity cost [$ per MW] /160000/
+	windCost 		Wind capacity cost [$ per MW] /130000/
 	storCost		Storage capacity cost [$ per kg] /<<storCostValue>>/
 	pemCost			PEM electrolyzer cost [$ per MW] /<<pemCostValue>>/
 	waterCost 		Cost of water [$ per kg] /.009/
@@ -69,7 +71,7 @@ positive variable
 	;
 
 $gdxin inputs
-$load g gas hydro t d r ca gtor ttod demandLoad genCost maxGen solarCap windCap solarCF windCF transCap transCost h2Demand storExisting pemExisting percentRenew
+$load g gas hydro t d r ca gtor ttod demandLoad genCost maxGen solarCap windCap solarCF windCF transCap transCost h2Demand h2Stationary storExisting pemExisting percentRenew windTransCost
 $gdxin
 
 *Variable limits
@@ -83,7 +85,8 @@ equations
 	genToDemand					Generation must equal load
 	renewableReq				Annual renewable requirement
 	storageSOC					Tracking storage levels
-	hydrogenDemand				Hydrogen production must meet demand
+	hydrogenDemandDaily			Hydrogen production must meet daily demand
+	hydrogenDemandAnnual		Hydrogen production must meet annual demand
 	maxStorage					Storage capacity constraint
 	storageFlowIn				Storage input limits
 	storageFlowOut				Storage output limits
@@ -91,28 +94,28 @@ equations
 	;
 
 obj..
-systemCost =e= sum((g,t),generation(g,t)*genCost(g))+sum((r,t,o),trans(r,t,o)*transCost(r,o))+sum(r,solarCost*solarNew(r)+windCost*windNew(r)+(storCap(r)-storExisting(r))*storCost+(pemCap(r)-pemExisting(r))*pemCost)+sum((r,t),fuelH2(r,t)*waterCost);
+systemCost =e= sum((g,t),generation(g,t)*genCost(g))+sum((r,t,o),trans(r,t,o)*transCost(r,o))+sum(r,solarCost*solarNew(r)+(windCost+windTransCost(r))*windNew(r)+(storCap(r)-storExisting(r))*storCost+(pemCap(r)-pemExisting(r))*pemCost)+sum((r,t),fuelH2(r,t)*waterCost);
 
 genToDemand(t,r)..
-	sum(g$gtor(g,r),generation(g,t))+(solarCap(r)+solarNew(r))*solarCF(r,t)+(windCap(r)+windNew(r))*windCF(r,t)+(sum(o,trans(o,t,r))*transLoss-sum(p,trans(r,t,p)))-storIn(r,t)+storageLossOut*storOut(r,t)-demandLoad(r,t)-fuelH2(r,t)/storageLossIn =g= 0;
+	sum(g$gtor(g,r),generation(g,t))+(solarCap(r)+solarNew(r))*solarCF(r,t)+(windCap(r)+windNew(r))*windCF(r,t)+(sum(o,trans(o,t,r))*transLoss-sum(p,trans(r,t,p)))-storIn(r,t)+storageLossOut*storOut(r,t)-demandLoad(r,t) =g= 0;
 
 renewableReq(r)..
 	sum(t,(solarCap(r)+solarNew(r))*solarCF(r,t)+(windCap(r)+windNew(r))*windCF(r,t)+sum(hydro$gtor(hydro,r),generation(hydro,t))+storOut(r,t)*storageLossOut)*(1-percentRenew(r))-percentRenew(r)*sum(t,(sum(g$gtor(g,r),generation(g,t)))) =g= 0;
 
 storageSOC(r,t)..
-	storSOC(r,t)-storSOC(r,t-1)-storIn(r,t-1)*storageLossIn+storOut(r,t-1) =e= 0;
+	storSOC(r,t)-storSOC(r,t-1)-storIn(r,t-1)*storageLossIn+storOut(r,t-1)-fuelH2(r,t-1) =e= 0;
 
-*hydrogenDemand(r,d)..
-*	sum(t$ttod(t,d),fuelH2(r,t))-h2Demand(r,d) =g= 0;
+hydrogenDemandDaily(r,d)..
+	sum(t$ttod(t,d),fuelH2(r,t))-h2Demand(r,d) =g= 0;
 
-hydrogenDemand(r)..
-	sum(t,fuelH2(r,t))-sum(d,h2Demand(r,d)) =g= 0;
+hydrogenDemandAnnual(r)..
+	sum(t,fuelH2(r,t))-sum(d,h2Demand(r,d)-h2Stationary(r)) =g= 0;
 
 maxStorage(r,t)..
 	storCap(r)-storSOC(r,t) =g= 0;
 
 storageFlowIn(r,t)..
-	pemCap(r)-storIn(r,t)-fuelH2(r,t)/storageLossIn =g= 0;
+	pemCap(r)-storIn(r,t) =g= 0;
 
 storageFlowOut(r,t)..
 	(sum(gas$gtor(gas,r),maxGen(gas)-generation(gas,t)))-storOut(r,t)*storageLossOut =g= 0;
@@ -121,7 +124,7 @@ transLimit..
 	importLimit-sum((r,t,ca),trans(r,t,ca)) =g= 0;
 
 model
-	good /obj,genToDemand,renewableReq,storageSOC,hydrogenDemand,maxStorage,storageFlowIn,storageFlowOut,transLimit/
+	good /obj,genToDemand,renewableReq,storageSOC,hydrogenDemandDaily,hydrogenDemandAnnual,maxStorage,storageFlowIn,storageFlowOut,transLimit/
 	;
 
 options

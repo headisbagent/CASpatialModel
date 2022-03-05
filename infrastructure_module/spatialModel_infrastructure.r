@@ -113,7 +113,7 @@ prepTravelInputs <- function(year,adoptionScenario,existingStations) {
 
 	total.demand <- aggregate.demand(year,adoptionScenario)
 
-	existingStations.clusters <- merge(x=unique(cluster.all[,.(cluster,taz)]),y=existingStations,by='taz')$cluster
+	existingStations.clusters <- merge(x=unique(cluster.all[,.(cluster,taz)]),y=existingStations,by='taz',allow.cartesian=TRUE)$cluster
 	existingStations.buffer.clusters <- merge(x=unique(cluster.buffer.all[,.(cluster,taz)]),y=existingStations,by='taz')$cluster
 
 	inputs$sets$r <- unique(c(unique(cluster.all[cluster%in%c(total.demand$cluster,existingStations$r),taz]),unique(cluster.buffer.all[cluster%in%c(total.demand$cluster,existingStations$r),taz])))

@@ -49,6 +49,7 @@ equations
 	constraint2 	Daily fueling capacity must be greater than fuel dispensed
 	constraint3		Hourly fueling capacity constraint
 	constraint4		Maximum number of stations by region constraint
+	constraint5		New station capacity in a region must at least match old capacity
 	;
 
 obj..
@@ -64,19 +65,22 @@ constraint1(v)..
 *	sum(r$VtoR(v,r),fueled(r,v))-demand(v) =g= 0;
 
 constraint2(r)..
-	sum(i,station(i,r)*dailyCapacity(i)+existingStations(i,r)*dailyCapacity(i))-sum((v,t),fueled(r,v,t)$demand(v)) =g= 0;
+	sum(i,station(i,r)*dailyCapacity(i))-sum((v,t),fueled(r,v,t)$demand(v)) =g= 0;
 
 *constraint2(r)..
 *	sum(i,station(i,r)*dailyCapacity(i))-sum(v,fueled(r,v)) =g= 0;
 
 constraint3(r,t)..
-	sum(v,fueled(r,v,t)$demand(v))-sum(i,station(i,r)*hourlyCapacity(i)+existingStations(i,r)*hourlyCapacity(i)) =l= 0;
+	sum(v,fueled(r,v,t)$demand(v))-sum(i,station(i,r)*hourlyCapacity(i)) =l= 0;
 
 constraint4(r)..
 	maxStations(r)-sum(i,station(i,r)) =g= 0;
 
+constraint5(r)..
+	sum(i,station(i,r)*dailyCapacity(i)-existingStations(i,r)*dailyCapacity(i)) =g= 0;
+
 model
-	spatialModel_infrastructure /obj,constraint1,constraint2,constraint3,constraint4/
+	spatialModel_infrastructure /obj,constraint1,constraint2,constraint3,constraint5/
 	;
 
 

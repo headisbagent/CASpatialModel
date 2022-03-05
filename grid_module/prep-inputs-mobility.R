@@ -19,6 +19,7 @@ get.dailyDemand <- function(scenario,dInput) {
 	demand <- demand[,.(demand=sum(value)),by=r]
 	demand[,r:=as.numeric(r)]
 	demand <- merge(x=demand,y=region.intersect,by.x='r',by.y='TAZ12')
+	demand[IPM_Region=='PNW',IPM_Region:='CA_N']
 	demand <- demand[,.(demand=sum(demand)),by='IPM_Region']
 	names(demand) <- c('r','value')
 	final <- data.table()
