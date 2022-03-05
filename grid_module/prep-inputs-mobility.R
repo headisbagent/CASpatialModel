@@ -34,10 +34,10 @@ get.dailyDemand <- function(scenario,dInput,yr) {
 
 	if(grepl('base',scenario,fixed=TRUE)|grepl('low',scenario,fixed=TRUE)) {
 		h2Stationary <- fread('inputs/inputs_h2Stationary_base.csv')
-		inputs$parameters$h2Stationary <- h2Stationary[year==yr,.(r,value)]
+		inputs$parameters$h2Stationary <- h2Stationary[Year==yr,.(r,value)]
 	} else if(grepl('high',scenario,fixed=TRUE)) {
 		h2Stationary <- fread('inputs/inputs_h2Stationary_high.csv')
-		inputs$parameters$h2Stationary <- h2Stationary[year==yr,.(r,value)]
+		inputs$parameters$h2Stationary <- h2Stationary[Year==yr,.(r,value)]
 	}
 
 	return(inputs)
