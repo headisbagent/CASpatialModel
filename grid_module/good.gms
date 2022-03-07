@@ -103,7 +103,7 @@ renewableReq(r)..
 	sum(t,(solarCap(r)+solarNew(r))*solarCF(r,t)+(windCap(r)+windNew(r))*windCF(r,t)+sum(hydro$gtor(hydro,r),generation(hydro,t))+storOut(r,t)*storageLossOut)*(1-percentRenew(r))-percentRenew(r)*sum(t,(sum(g$gtor(g,r),generation(g,t)))) =g= 0;
 
 storageSOC(r,t)..
-	storSOC(r,t)-storSOC(r,t-1)-storIn(r,t-1)*storageLossIn+storOut(r,t-1)-fuelH2(r,t-1) =e= 0;
+	storSOC(r,t)-storSOC(r,t-1)-storIn(r,t-1)*storageLossIn+storOut(r,t-1)+fuelH2(r,t-1) =e= 0;
 
 hydrogenDemandDaily(r,d)..
 	sum(t$ttod(t,d),fuelH2(r,t))-h2Demand(r,d) =g= 0;
