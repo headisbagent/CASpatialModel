@@ -9,7 +9,7 @@ region.key <- fread('inputs/inputs_region_key.csv')
 region.intersect <- merge(x=region.intersect,y=region.key,by.x='IPM_Region',by.y='RegionName')
 region.intersect <- region.intersect[,.(County,TAZ12,IPM_Region=RegionSimple)]
 
-scenario <- 'CSTDM_trips10_distance150_prop01'
+h2Demand.adjustment <- fread('inputs/h2Demand_adjustment.csv')
 
 get.dailyDemand <- function(scenario,dInput,yr) {
 	inputs <- list()
@@ -29,8 +29,15 @@ get.dailyDemand <- function(scenario,dInput,yr) {
 		final <- rbind(final,hold)
 	}
 	final <- final[,.(r,d,value)]
+	final <- merge(x=final,y=h2Demand.adjustment,by='d',all.x=TRUE)
+	final[,value.adj:=value*finalAdjust]
+	final <- final[,.(r,d,value=value.adj)]
 
 	inputs$parameters$h2Demand <- final
+
+	freeStorageH2 <- final[,.(value=max(value)),by=r]
+
+	inputs$parameters$freeStorageH2 <- freeStorageH2
 
 	if(grepl('base',scenario,fixed=TRUE)|grepl('low',scenario,fixed=TRUE)) {
 		h2Stationary <- fread('inputs/inputs_h2Stationary_base.csv')
