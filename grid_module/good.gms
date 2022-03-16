@@ -121,7 +121,7 @@ maxStorage(r,t)..
 	storCap(r)-storSOC(r,t) =g= 0;
 
 storageFlowIn(r,t)..
-	pemCap(r)-storIn(r,t) =g= 0;
+	pemCap(r)-storIn(r,t)-freeH2(r,t)/storageLossIn =g= 0;
 
 storageFlowOut(r,t)..
 	(sum(gas$gtor(gas,r),maxGen(gas)-generation(gas,t)))-storOut(r,t)*storageLossOut =g= 0;

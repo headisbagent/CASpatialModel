@@ -9,7 +9,7 @@ FuelType.key <- data.table(FuelType=c('Biomass','Coal','Fwaste','Geothermal','Hy
 fetchOutputs <- function(scenario,yr) {
 	scenario.name <- paste(yr,scenario,sep='_')
 
-	variable.names <- c('generation','trans','solarNew','windNew','storSOC','storIn','storOut','storCap','pemCap','fuelH2','genCost','demandLoad','maxGen','solarCap','windCap','solarCF','windCF','transCap','transCost','h2Demand','h2Stationary')
+	variable.names <- c('generation','trans','solarNew','windNew','storSOC','storIn','storOut','storCap','pemCap','fuelH2','freeH2','genCost','demandLoad','maxGen','solarCap','windCap','solarCF','windCF','transCap','transCost','h2Demand','h2Stationary','freeStorageH2')
 
 	output <- list()
 	for(i in 1:length(variable.names)) {
@@ -26,7 +26,7 @@ fetchOutputs.allYears <- function(scenario) {
 		hold[[i]] <- fetchOutputs(scenario,years[i])
 	}
 	output <- lapply(seq_along(hold[[1]]),function(x) rbind(hold[[1]][[x]],hold[[2]][[x]],hold[[3]][[x]],hold[[4]][[x]],hold[[5]][[x]],hold[[6]][[x]]))
-	names(output) <- c('generation','trans','solarNew','windNew','storSOC','storIn','storOut','storCap','pemCap','fuelH2','genCost','demandLoad','maxGen','solarCap','windCap','solarCF','windCF','transCap','transCost','h2Demand','h2Stationary')
+	names(output) <- c('generation','trans','solarNew','windNew','storSOC','storIn','storOut','storCap','pemCap','fuelH2','freeH2','genCost','demandLoad','maxGen','solarCap','windCap','solarCF','windCF','transCap','transCost','h2Demand','h2Stationary','freeStorageH2')
 	return(output)
 }
 
@@ -54,15 +54,19 @@ plot.GeneratorsMap <- function() {
 	generators.all <- rbind(generators.other,generators.solar.wind)
 	forPlot <- generators.all[,.(FuelType,Capacity,LAT,LON)]
 	forPlot <- st_as_sf(forPlot,coords=c('LON','LAT'),crs=4269)
+	forPlot <- merge(x=forPlot,y=FuelType.key,by='FuelType')
 
 	forPlot.wecc <- st_transform(wecc.simple,crs=4269)
 
 	plotSave <- ggplot()+
 		geom_sf(data=forPlot.wecc,fill=NA)+
-		geom_sf(data=forPlot,aes(color=FuelType,size=Capacity))+
+		geom_sf(data=forPlot,aes(fill=FuelType.simple,size=Capacity),colour='black',shape=21,alpha=.7)+
+		scale_fill_manual(name='Fuel Type',values=c('Nuclear'='#bebada','Coal'='#d9d9d9','Hydro'='#80b1d3','NaturalGas'='#fb8072','Biomass'='#b3de69','Geothermal'='#fdb462','Other'='#fccde5','Oil'='#bc80bd','Wind'='#8dd3c7','Solar'='#ffffb3'))+
+		scale_size_continuous(name='Capacity [MW]')+
 		geom_sf_text(data=wecc.centroids,aes(label=simple),size=5)+
 		coord_sf()+
-		theme_bw()%+replace% theme(plot.background=element_blank(),panel.background=element_blank(),panel.border=element_blank(),axis.line=element_blank(),axis.text=element_blank(),axis.ticks=element_blank(),axis.title=element_blank())
+		theme_bw()%+replace% theme(plot.background=element_blank(),panel.background=element_blank(),panel.border=element_blank(),axis.line=element_blank(),axis.text=element_blank(),axis.ticks=element_blank(),axis.title=element_blank())+
+		guides(fill=guide_legend(override.aes=list(size=10)))
 	ggsave(plotSave,file='figures/generator_map.pdf',height=7,width=9)
 	ggsave(plotSave,file='figures/generator_map.png',height=7,width=9)	
 }
@@ -106,14 +110,14 @@ parseGeneration <- function(input) {
 
 	output <- rbind(output,solar.generation,wind.generation,fill=TRUE)
 	output <- merge(x=output,y=FuelType.key,by='FuelType')
-	output$FuelType.simple <- factor(output$FuelType.simple,levels=c('Nuclear','Coal','Hydro','NaturalGas','Biomass','Geothermal','Other','Oil','Wind','Solar'))
+	output$FuelType.simple <- factor(output$FuelType.simple,levels=c('Solar','Wind','Oil','Other','Geothermal','Biomass','NaturalGas','Hydro','Coal','Nuclear'))
 	return(output)
 }
 
 plot.GenerationMix <- function(input,scenario) {
 	forPlot <- input[,.(generation=sum(generation)/10^6),by=.(FuelType.simple,r,year)]
 
-	plotSave <- ggplot(data=forPlot,aes(x=year,y=generation,fill=rev(FuelType.simple)))+
+	plotSave <- ggplot(data=forPlot,aes(x=year,y=generation,fill=FuelType.simple))+
 		geom_bar(stat='identity')+
 		scale_fill_manual(name='Fuel Type',values=c('Nuclear'='#bebada','Coal'='#d9d9d9','Hydro'='#80b1d3','NaturalGas'='#fb8072','Biomass'='#b3de69','Geothermal'='#fdb462','Other'='#fccde5','Oil'='#bc80bd','Wind'='#8dd3c7','Solar'='#ffffb3'))+
 		xlab('Year')+
@@ -128,7 +132,7 @@ plot.exampleDispatch <- function(input,days,scenario) {
 	timePeriod <- ((min(days)-1)*24):(max(days)*24)
 	forPlot <- input[t%in%timePeriod,.(generation=sum(generation)),by=.(t,r,year,FuelType.simple)]
 	for(yr in unique(forPlot$year)) {
-		plotSave <- ggplot(data=forPlot[year==yr],aes(x=t,y=generation/1000,fill=rev(FuelType.simple)))+
+		plotSave <- ggplot(data=forPlot[year==yr],aes(x=t,y=generation/1000,fill=FuelType.simple))+
 			geom_area()+
 			scale_fill_manual(name='Fuel Type',values=c('Nuclear'='#bebada','Coal'='#d9d9d9','Hydro'='#80b1d3','NaturalGas'='#fb8072','Biomass'='#b3de69','Geothermal'='#fdb462','Other'='#fccde5','Oil'='#bc80bd','Wind'='#8dd3c7','Solar'='#ffffb3'))+
 			xlab('Hour of the Year')+
@@ -149,6 +153,11 @@ plot.detailedDispatch <- function(input,input.gen,days,scenario) {
 	forPlot.storOut <- input$storOut[as.numeric(t)%in%timePeriod,.(t=as.numeric(t),r,year,generation=value*.025,Source='H2 CT')]
 
 	forPlot.supply <- rbind(forPlot.gen,forPlot.imports,forPlot.storOut)
+	forPlot.supply$Source <- factor(forPlot.supply$Source,levels=c('Imports','H2 CT','Solar','Wind','Oil','Other','Geothermal','Biomass','NaturalGas','Hydro','Coal','Nuclear'))
+
+	missing.vals <- CJ(t=timePeriod,r=unique(forPlot.supply$r),year=unique(forPlot.supply$year),Source=unique(forPlot.supply$Source))
+	forPlot.supply <- merge(x=forPlot.supply,y=missing.vals,by=c('t','r','year','Source'),all.y=TRUE)
+	forPlot.supply[is.na(generation),generation:=0]
 
 	# Demand-side
 	forPlot.load <- input$demandLoad[as.numeric(t)%in%timePeriod,.(t=as.numeric(t),r,year,demand=value,Type='Load')]
@@ -158,7 +167,10 @@ plot.detailedDispatch <- function(input,input.gen,days,scenario) {
 
 	storIn <- input$storIn
 	storIn$t <- as.numeric(storIn$t)
-	forPlot.pem <- storIn[t%in%timePeriod,.(t,r,year,pem=value)]
+	freeH2 <- input$freeH2
+	freeH2$t <- as.numeric(freeH2$t)
+	forPlot.pem <- merge(x=storIn,y=freeH2,by=c('r','t','year'))
+	forPlot.pem <- forPlot.pem[t%in%timePeriod,.(t,r,year,pem=value.x+value.y/18.2)]
 	forPlot.pem <- merge(x=forPlot.exports,y=forPlot.pem,by=c('t','r','year'))
 	forPlot.pem <- forPlot.pem[,.(t,r,year,demand=demand+pem,Type='Load+Exports+PEM')]
 
@@ -166,8 +178,8 @@ plot.detailedDispatch <- function(input,input.gen,days,scenario) {
 
 	for(yr in unique(forPlot.supply$year)) {
 		plotSave <- ggplot()+
-			geom_area(data=forPlot.supply[year==yr],aes(x=t,y=generation/1000,fill=rev(Source)))+
-			scale_fill_manual(name='Supply Source',values=c('Nuclear'='#bebada','Coal'='#d9d9d9','Hydro'='#80b1d3','NaturalGas'='#fb8072','Biomass'='#b3de69','Geothermal'='#fdb462','Other'='#fccde5','Oil'='#bc80bd','Wind'='#8dd3c7','Solar'='#ffffb3','H2 CT'='#1f78b4','Imports'='black'))+
+			geom_area(data=forPlot.supply[year==yr],aes(x=t,y=generation/1000,fill=Source))+
+			scale_fill_manual(name='Supply Source',values=c('Nuclear'='#bebada','Coal'='#d9d9d9','Hydro'='#80b1d3','NaturalGas'='#fb8072','Biomass'='#b3de69','Geothermal'='#fdb462','Other'='#fccde5','Oil'='#bc80bd','Wind'='#8dd3c7','Solar'='#ffffb3','H2 CT'='#1f78b4','Imports'='firebrick'))+
 			geom_line(data=forPlot.demand[year==yr],aes(x=t,y=demand/1000,linetype=Type))+
 			scale_linetype_manual(name='Demand Source',values=c('dotted','longdash','solid'))+
 			xlab('Hour of the Year')+
@@ -187,12 +199,14 @@ plot.curtailment <- function(input,input.generation,scenario) {
 
 	total.demand.electricity <- input$demandLoad[,.(demand.load=sum(value)),by=.(t=as.numeric(t),year)]
 	total.demand.h2 <- input$storIn[,.(demand.h2.load=sum(value)),by=.(t=as.numeric(t),year)]
+	total.demand.freeH2 <- input$freeH2[,.(demand.freeH2.load=sum(value)/18.2),by=.(t=as.numeric(t),year)]
 
 	forPlot <- merge(x=total.transmissionLoss,y=total.generation,by=c('t','year'))
 	forPlot <- merge(x=forPlot,y=total.h2ct,by=c('t','year'))
 	forPlot <- merge(x=forPlot,y=total.demand.electricity,by=c('t','year'))
 	forPlot <- merge(x=forPlot,y=total.demand.h2,by=c('t','year'))
-	forPlot[,curtailment:=generation+h2CT-trans.loss-demand.load-demand.h2.load]
+	forPlot <- merge(x=forPlot,y=total.demand.freeH2,by=c('t','year'))
+	forPlot[,curtailment:=generation+h2CT-trans.loss-demand.load-demand.h2.load-demand.freeH2.load]
 
 	plotSave <- ggplot(data=forPlot[curtailment>=0],aes(x=t,y=curtailment/1000))+
 		geom_line()+
@@ -447,11 +461,46 @@ plot.hydrogenCT <- function(input,input.gen,scenario) {
 	}
 }
 
+write.Results <- function(input,input.gen,scenarioLabel) {
+	gen.loc <- unique(rbind(generators.other[,.(LAT,LON,RegionName)],generators.solar.wind[,.(LAT,LON,RegionName)]))
+	gen.loc <- gen.loc[!duplicated(gen.loc[,.(LAT,LON)]),]
+	gen.all <- merge(x=input.gen,y=gen.loc,by=c('LAT','LON'),all.x=TRUE)
+	gen.all[FuelType%in%c('Solar','Wind'),FuelCostTotal:=0]
+
+	proportions <- gen.all[!is.na(RegionName),.(generation=sum(generation,na.rm=TRUE)),by=.(year,r,RegionName)]
+	proportions[,total.gen:=sum(generation),by=.(year,r)]
+	proportions[,fraction:=generation/total.gen]
+
+	wholesale.price <- gen.all[!is.na(RegionName)&generation>0,.(WholesalePrice=max(FuelCostTotal,na.rm=TRUE)),by=.(t,year,r=RegionName)]
+	fwrite(wholesale.price,file=paste0('results/wholesale_prices_',scenarioLabel,'.csv'),row.names=FALSE)
+
+	pemCap <- merge(x=input$pemCap,y=proportions,by=c('r','year'))
+	pemCap <- pemCap[,.(r=RegionName,year,pemCap=value*fraction)]
+	fwrite(pemCap,file=paste0('results/pemCap_',scenarioLabel,'.csv'),row.names=FALSE)
+
+	storCap <- merge(x=input$storCap,y=proportions,by=c('r','year'))
+	storCap <- storCap[,.(r=RegionName,year,storCap=value*fraction)]
+	fwrite(storCap,file=paste0('results/storCap_',scenarioLabel,'.csv'),row.names=FALSE)
+
+	fuelH2 <- merge(x=input$fuelH2,y=proportions,by=c('r','year'),all.x=TRUE,allow.cartesian=TRUE)
+	fuelH2 <- fuelH2[,.(r=RegionName,year,t,fuelH2=value*fraction)]
+	fwrite(fuelH2,file=paste0('results/fuelH2_',scenarioLabel,'.csv'),row.names=FALSE)
+
+	freeH2 <- merge(x=input$freeH2,y=proportions,by=c('r','year'),all.x=TRUE,allow.cartesian=TRUE)
+	freeH2 <- freeH2[,.(r=RegionName,year,t,fuelH2=value*fraction)]
+	fwrite(freeH2,file=paste0('results/freeH2_',scenarioLabel,'.csv'),row.names=FALSE)
+
+	h2CT <- merge(x=input$storOut,y=proportions,by=c('r','year'),all.x=TRUE,allow.cartesian=TRUE)
+	h2CT <- h2CT[,.(r=RegionName,year,t,h2CT=value*fraction)]
+	fwrite(h2CT,file=paste0('results/h2CT_',scenarioLabel,'.csv'),row.names=FALSE)
+}
+
 plot.all <- function(scenario,scenarioLabel) {
 	scenario.run <- fetchOutputs.allYears(scenario)
 	scenario.run.gen <- parseGeneration(scenario.run)
 
-	# plot.renewableCF(scenario.run)
+	write.Results(scenario.run,scenario.run.gen,scenarioLabel)
+	plot.renewableCF(scenario.run)
 	plot.GenerationMix(scenario.run.gen,scenarioLabel)
 	plot.exampleDispatch(scenario.run.gen,78:80,scenarioLabel)
 	plot.exampleDispatch(scenario.run.gen,170:172,scenarioLabel)
@@ -474,6 +523,8 @@ plot.all <- function(scenario,scenarioLabel) {
 }
 
 plot.all('highDemand_1-365','highDemand')
+plot.all('lowDemand_1-365','lowDemand')
+
 plot.all('highDemand_noCurtail_1-365','highDemand_noCurtail')
 plot.all('highDemand_noH2Demand_1-365','highDemand_noH2Demand')
 plot.all('highDemand_noCurtail_noH2Demand_1-365','highDemand_noCurtail_noH2Demand')
