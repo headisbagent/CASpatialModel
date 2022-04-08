@@ -81,6 +81,7 @@ $gdxin
 	trans.up(r,t,o) = transCap(r,o);
 	storCap.lo(r) = storExisting(r);
 	pemCap.lo(r) = pemExisting(r);
+	fuelH2.fx(r,t)$(t.last) = 0;
 
 equations
 	obj							Objective function minimizing total cost
@@ -115,7 +116,7 @@ hydrogenDemandDaily(r,d)..
 	sum(t$ttod(t,d),fuelH2(r,t)+freeH2(r,t))-h2Demand(r,d) =g= 0;
 
 hydrogenDemandAnnual(r)..
-	sum(t,fuelH2(r,t))-sum(d,h2Demand(r,d)-h2Stationary(r)) =g= 0;
+	sum(t,fuelH2(r,t)+freeH2(r,t))-sum(d,h2Demand(r,d)+h2Stationary(r)) =g= 0;
 
 maxStorage(r,t)..
 	storCap(r)-storSOC(r,t) =g= 0;
